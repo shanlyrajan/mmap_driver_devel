@@ -20,7 +20,7 @@
 
 
 /*
- * Include definitions for rdev hardware registers, types and more	
+* Include definitions for rdev hardware registers, types and more	
  */
 #include "roach_common.h"        /* local definitions */
 #include "ppc4xx_gpio.c"
@@ -34,8 +34,8 @@ unsigned int fpga;
 #define ROACH_NR_DEVS 2
 
 /**
- * Data type for mapping of ROACH2 Board memory space
- * The structure holds pointers for the GPIO, SMAP and FPGA mappings
+* Data type for mapping of ROACH2 Board memory space
+* The structure holds pointers for the GPIO, SMAP and FPGA mappings
  */
 
 typedef struct roach_map{
@@ -48,7 +48,7 @@ typedef struct roach_map{
 }rmap_t;
 
 /**
- *  Device structure for this device, on top of a character device
+*  Device structure for this device, on top of a character device
  */
 typedef struct roach{
   rmap_t rmap;
@@ -61,63 +61,72 @@ static roach_t *rdev = NULL;
 #define MAX_ROACH_DEV 2
 
 /*
- * Common roach VMA ops.
+* Common roach VMA ops.
  */
 
 void roach_vma_open(struct vm_area_struct *vma)
 {
-        printk(KERN_NOTICE "roach VMA open, virt %lx, phys %lx\n",
-               vma->vm_start, vma->vm_pgoff << PAGE_SHIFT);
+  printk(KERN_NOTICE "roach VMA open, virt %lx, phys %lx\n",
+      vma->vm_start, vma->vm_pgoff << PAGE_SHIFT);
 }
 
 void roach_vma_close(struct vm_area_struct *vma)
 {
-        printk(KERN_NOTICE "roach VMA close.\n");
+  printk(KERN_NOTICE "roach VMA close.\n");
+}
+
+static int roach_vma_sync(struct vm_area_struct *vma, unsigned long offset, size_t size, unsigned int flags)
+{
+  printk(KERN_NOTICE "%s: offset: %lu size: %lx flags:%d\n", __func__, offset, size, flags);
+  
+
+  return 0;
 }
 
 static struct vm_operations_struct roach_remap_vm_ops = {
-        .open = roach_vma_open,
-        .close = roach_vma_close,
+  .open = roach_vma_open,
+  .close = roach_vma_close,
+  .sync = roach_vma_sync,
 };
 
 
 static int roach_mem_mmap(struct file *file,
-                    struct vm_area_struct *vma)
+    struct vm_area_struct *vma)
 {
-        unsigned long start = vma->vm_start;
-        unsigned long size = vma->vm_end - vma->vm_start;
-        unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-        unsigned long page, pos;
+  unsigned long start = vma->vm_start;
+  unsigned long size = vma->vm_end - vma->vm_start;
+  unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
+  unsigned long page, pos;
 
-        printk(KERN_NOTICE "%s: vm_start %lx, vm_end %lx, size %lx, phys %lx\n",
-               __func__, vma->vm_start, vma->vm_end, (vma->vm_end - vma->vm_start), vma->vm_pgoff << PAGE_SHIFT);
+  printk(KERN_NOTICE "%s: vm_start %lx, vm_end %lx, size %lx, phys %lx\n",
+      __func__, vma->vm_start, vma->vm_end, (vma->vm_end - vma->vm_start), vma->vm_pgoff << PAGE_SHIFT);
 
-        if (offset + size > ROACH_FPGA_LENGTH) {
-                return -EINVAL;
-        }
+  if (offset + size > ROACH_FPGA_LENGTH) {
+    return -EINVAL;
+  }
 
-        pos = (unsigned long)(rdev->rmap.fpga_virt) + offset;
-        printk(KERN_NOTICE "%s: pos to be converted : %lx\n", __func__, pos);
+  pos = (unsigned long)(rdev->rmap.fpga_virt) + offset;
+  printk(KERN_NOTICE "%s: pos to be converted : %lx\n", __func__, pos);
 
-        while (size > 0) {
-                page = vmalloc_to_pfn((void *)pos);
-                if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
-                        return -EAGAIN;
-                }
-                start += PAGE_SIZE;
-                pos += PAGE_SIZE;
-                if (size > PAGE_SIZE)
-                        size -= PAGE_SIZE;
-                else
-                        size = 0;
-        }
+  while (size > 0) {
+    page = vmalloc_to_pfn((void *)pos);
+    if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
+      return -EAGAIN;
+    }
+    start += PAGE_SIZE;
+    pos += PAGE_SIZE;
+    if (size > PAGE_SIZE)
+      size -= PAGE_SIZE;
+    else
+      size = 0;
+  }
 
-        vma->vm_flags |= VM_RESERVED;   /* avoid to swap out this VMA */
+  vma->vm_flags |= VM_RESERVED;   /* avoid to swap out this VMA */
 
-        vma->vm_ops = &roach_remap_vm_ops;
-        roach_vma_open(vma);
+  vma->vm_ops = &roach_remap_vm_ops;
+  roach_vma_open(vma);
 
-        return 0;
+  return 0;
 
 }
 
@@ -129,74 +138,74 @@ int roach_mem_open(struct inode *inode, struct file *filp)
 
 ssize_t roach_mem_read(struct file *filp, char __user *buf, size_t cnt, loff_t *f_pos)
 {
-        unsigned long i;
-        unsigned long start;
+  unsigned long i;
+  unsigned long start;
 
   printk(KERN_NOTICE "rdev mem read called with cnt val=%u\n", cnt);
-        if(*f_pos < ROACH_FPGA_LENGTH){
-                /* Writn to FPGA*/
-                start = *f_pos;
-                if(start >= ROACH_FPGA_LENGTH){
-                        cnt = 0;
-                }
-                else if(start + cnt > ROACH_FPGA_LENGTH){
-                        cnt = ROACH_FPGA_LENGTH - start;
-                }
+  if(*f_pos < ROACH_FPGA_LENGTH){
+    /* Writn to FPGA*/
+    start = *f_pos;
+    if(start >= ROACH_FPGA_LENGTH){
+      cnt = 0;
+    }
+    else if(start + cnt > ROACH_FPGA_LENGTH){
+      cnt = ROACH_FPGA_LENGTH - start;
+    }
 
-                for(i = 0; i < cnt; i+=4){
-                        __put_user(in_be32(rdev->rmap.fpga_virt + i + start), (uint32_t *)(buf + i));
-                }
-        }
+    for(i = 0; i < cnt; i+=4){
+      __put_user(in_be32(rdev->rmap.fpga_virt + i + start), (uint32_t *)(buf + i));
+    }
+  }
 
-        *f_pos += cnt;
-        printk(KERN_INFO "Reading %lld data from fpga \n", *f_pos);
-        return cnt;
+  *f_pos += cnt;
+  printk(KERN_INFO "Reading %lld data from fpga \n", *f_pos);
+  return cnt;
 }
 
 ssize_t roach_mem_write(struct file *filp, const char __user *buf, size_t cnt, loff_t *f_pos)
 {
-	unsigned long i;
-	unsigned long start;
-	unsigned int tmpS;
-	int retval = -EIO;
-	uint32_t word_count;
-	volatile uint32_t *src;
-	size_t have_written, will_write;
+  unsigned long i;
+  unsigned long start;
+  unsigned int tmpS;
+  int retval = -EIO;
+  uint32_t word_count;
+  volatile uint32_t *src;
+  size_t have_written, will_write;
 
 
-	have_written = 0; /* the number of bytes which we were given which we have written */
+  have_written = 0; /* the number of bytes which we were given which we have written */
 
-	printk(KERN_DEBUG "%s:Writing FPGA (size = %d bytes) to location 0x%x\n", __func__, cnt, (unsigned int) (rdev->rmap.fpga_virt + *f_pos));
+  printk(KERN_DEBUG "%s:Writing FPGA (size = %d bytes) to location 0x%x\n", __func__, cnt, (unsigned int) (rdev->rmap.fpga_virt + *f_pos));
 
-	if(*f_pos >= ROACH_FPGA_LENGTH){
-		printk(KERN_WARNING "request for way too much data, fpga size %u\n", ROACH_FPGA_LENGTH);
-		have_written = -EINVAL;
-		goto out_free_mutex;
-	}
+  if(*f_pos >= ROACH_FPGA_LENGTH){
+    printk(KERN_WARNING "request for way too much data, fpga size %u\n", ROACH_FPGA_LENGTH);
+    have_written = -EINVAL;
+    goto out_free_mutex;
+  }
 
-        if(*f_pos < ROACH_FPGA_LENGTH){
-                printk(KERN_INFO "Entering FPGA write with cnt value=%u", cnt);
-                /* Writn to FPGA*/
-                start = *f_pos;
-                if(start >= ROACH_FPGA_LENGTH){
-                        cnt = 0;
-                }
-                else if(start + cnt > ROACH_FPGA_LENGTH){
-                        cnt = ROACH_FPGA_LENGTH - start;
-                }
+  if(*f_pos < ROACH_FPGA_LENGTH){
+    printk(KERN_INFO "Entering FPGA write with cnt value=%u", cnt);
+    /* Writn to FPGA*/
+    start = *f_pos;
+    if(start >= ROACH_FPGA_LENGTH){
+      cnt = 0;
+    }
+    else if(start + cnt > ROACH_FPGA_LENGTH){
+      cnt = ROACH_FPGA_LENGTH - start;
+    }
 
-                for(i = 0; i < cnt; i += 4){
-                /*TODO: Write as u32s not shorts*/
-                        __get_user(tmpS, (unsigned int *)(buf + i));
-                        out_be32(rdev->rmap.fpga_virt + i + *f_pos, tmpS);
-                }
-        }
+    for(i = 0; i < cnt; i += 4){
+      /*TODO: Write as u32s not shorts*/
+      __get_user(tmpS, (unsigned int *)(buf + i));
+      out_be32(rdev->rmap.fpga_virt + i + *f_pos, tmpS);
+    }
+  }
 
-        *f_pos += cnt;
-        printk(KERN_INFO "Writing %lld data to fpga \n", *f_pos);
+  *f_pos += cnt;
+  printk(KERN_INFO "Writing %lld data to fpga \n", *f_pos);
 out_free_mutex:
 out:
-        return cnt;
+  return cnt;
 }
 
 int roach_mem_release(struct inode *inode, struct file *filp)
@@ -258,80 +267,80 @@ int roach_config_open(struct inode *inode, struct file *filp)
 
 ssize_t roach_config_write(struct file *filp, const char __user *buf, size_t cnt, loff_t *f_pos)
 {
-	int i;
-	int retval = -EIO;
-	uint32_t word_count;
-	volatile uint32_t *src;
-	size_t have_written, will_write;
+  int i;
+  int retval = -EIO;
+  uint32_t word_count;
+  volatile uint32_t *src;
+  size_t have_written, will_write;
 
 
-	have_written = 0; /* the number of bytes which we were given which we have written */
+  have_written = 0; /* the number of bytes which we were given which we have written */
 
-	if(gateware_bytes >= SMAP_IMAGE_SIZE){
-		printk(KERN_WARNING "request for way too much data, gateware size %u\n", SMAP_IMAGE_SIZE);
-		have_written = -EINVAL;
-		goto out_free_mutex;
-	}
+  if(gateware_bytes >= SMAP_IMAGE_SIZE){
+    printk(KERN_WARNING "request for way too much data, gateware size %u\n", SMAP_IMAGE_SIZE);
+    have_written = -EINVAL;
+    goto out_free_mutex;
+  }
 
-	while(have_written < cnt){
-		will_write = cnt - have_written;
-		if(will_write > PAGE_SIZE){
-			will_write = PAGE_SIZE;
-		}
+  while(have_written < cnt){
+    will_write = cnt - have_written;
+    if(will_write > PAGE_SIZE){
+      will_write = PAGE_SIZE;
+    }
 
-		retval = copy_from_user((uint32_t *)(rdev->rmap.tx_buf), (uint32_t *)(buf + have_written), will_write);
-		if(retval != 0){
-			printk(KERN_WARNING "copy from user failed with code %d, at %u/%u in write, %u bytes programmed so far\n", retval, have_written, cnt, gateware_bytes + have_written);
-			goto out_free_mutex;
-		}
+    retval = copy_from_user((uint32_t *)(rdev->rmap.tx_buf), (uint32_t *)(buf + have_written), will_write);
+    if(retval != 0){
+      printk(KERN_WARNING "copy from user failed with code %d, at %u/%u in write, %u bytes programmed so far\n", retval, have_written, cnt, gateware_bytes + have_written);
+      goto out_free_mutex;
+    }
 
-		if((gateware_bytes + have_written + will_write) > SMAP_IMAGE_SIZE){
-			if((gateware_bytes + have_written) < SMAP_IMAGE_SIZE){
-				printk(KERN_WARNING "truncating buffer to %u as total exceeds gatware size %u\n", will_write, SMAP_IMAGE_SIZE);
-				will_write = SMAP_IMAGE_SIZE - (gateware_bytes + have_written);
-			} else {
-				printk(KERN_WARNING "writing too much data, want %u, gateware size %u\n", gateware_bytes + have_written + will_write, SMAP_IMAGE_SIZE);
-				will_write = 0;
-				break; /* WARNING: end loop, but check if we need to do GPIO */
-			}
-		}
+    if((gateware_bytes + have_written + will_write) > SMAP_IMAGE_SIZE){
+      if((gateware_bytes + have_written) < SMAP_IMAGE_SIZE){
+        printk(KERN_WARNING "truncating buffer to %u as total exceeds gatware size %u\n", will_write, SMAP_IMAGE_SIZE);
+        will_write = SMAP_IMAGE_SIZE - (gateware_bytes + have_written);
+      } else {
+        printk(KERN_WARNING "writing too much data, want %u, gateware size %u\n", gateware_bytes + have_written + will_write, SMAP_IMAGE_SIZE);
+        will_write = 0;
+        break; /* WARNING: end loop, but check if we need to do GPIO */
+      }
+    }
 
-		word_count = will_write / 4;
-		src = rdev->rmap.tx_buf;
+    word_count = will_write / 4;
+    src = rdev->rmap.tx_buf;
 
-		for(i = 0; i < word_count; i++){
-			out_be32((uint32_t *)(rdev->rmap.smap_virt), *src);
-			src++;
-		}
+    for(i = 0; i < word_count; i++){
+      out_be32((uint32_t *)(rdev->rmap.smap_virt), *src);
+      src++;
+    }
 
-		if((i * 4) < will_write){
-			printk(KERN_WARNING "request to write %u was not a multiple of 4, only writing %u", i * 4, will_write);
-			have_written += (i * 4);
-			break; /* WARNING: assumes that this only occurs for last few bytes of cnt */
-		}
+    if((i * 4) < will_write){
+      printk(KERN_WARNING "request to write %u was not a multiple of 4, only writing %u", i * 4, will_write);
+      have_written += (i * 4);
+      break; /* WARNING: assumes that this only occurs for last few bytes of cnt */
+    }
 
-		have_written += will_write;
-	}
+    have_written += will_write;
+  }
 
-	gateware_bytes += have_written;
+  gateware_bytes += have_written;
 
-	if(gateware_bytes == SMAP_IMAGE_SIZE){
-		/* Poll until done pin is enabled */
-		for (i = 0; (i < SMAP_DONE_WAIT) && (ppc4xx_gpio_get(rdev->gc, GPIO_SMAP_DONE) == 0); i++);
+  if(gateware_bytes == SMAP_IMAGE_SIZE){
+    /* Poll until done pin is enabled */
+    for (i = 0; (i < SMAP_DONE_WAIT) && (ppc4xx_gpio_get(rdev->gc, GPIO_SMAP_DONE) == 0); i++);
 
-		if(i == SMAP_DONE_WAIT){
-			printk(KERN_ERR "error: SelectMAP programming failed, done stuck low\n");
-                        have_written = -EIO;
-                } else {
-                        printk(KERN_INFO "ROACH2 Virtex-6 configuration completed successfully\n");
-                }
+    if(i == SMAP_DONE_WAIT){
+      printk(KERN_ERR "error: SelectMAP programming failed, done stuck low\n");
+      have_written = -EIO;
+    } else {
+      printk(KERN_INFO "ROACH2 Virtex-6 configuration completed successfully\n");
+    }
 
-		goto out_free_mutex;
+    goto out_free_mutex;
 
-	}
+  }
 out_free_mutex:
 out:
-	return have_written;	
+  return have_written;	
 }
 
 
@@ -473,50 +482,50 @@ out:
 
 static void roach_exit(void)
 {
-	gpio_release_resources(rdev->gc);
-	kfree(rdev->gc);
-	rdev->gc = NULL;
-	printk(KERN_INFO "gpio released\n");
+  gpio_release_resources(rdev->gc);
+  kfree(rdev->gc);
+  rdev->gc = NULL;
+  printk(KERN_INFO "gpio released\n");
 
-	if(rdev){
+  if(rdev){
 #define release_roach_region(p, q) \
-		if(rdev->rmap.p##_virt){ \
-			iounmap(rdev->rmap.p##_virt); \
-			rdev->rmap.p##_virt = NULL; \
-		} \
-		if(rdev->rmap.p##_phy){ \
-			release_mem_region(rdev->rmap.p##_phy, ROACH_##q##_LENGTH); \
-			rdev->rmap.p##_phy = 0; \
-		}
+    if(rdev->rmap.p##_virt){ \
+      iounmap(rdev->rmap.p##_virt); \
+      rdev->rmap.p##_virt = NULL; \
+    } \
+    if(rdev->rmap.p##_phy){ \
+      release_mem_region(rdev->rmap.p##_phy, ROACH_##q##_LENGTH); \
+      rdev->rmap.p##_phy = 0; \
+    }
 
-		release_roach_region(smap, SMAP)
-			release_roach_region(fpga, FPGA)
+    release_roach_region(smap, SMAP)
+      release_roach_region(fpga, FPGA)
 #undef release_roach_region
-			printk(KERN_INFO "smap and fpga regions released\n");
-		if(rdev->rmap.tx_buf){
-			free_page((int)rdev->rmap.tx_buf);
-			rdev->rmap.tx_buf = NULL;
-		}
-		printk(KERN_INFO "tx_buf released\n");
-		if(rdev->rmap.rx_buf){
-			free_page((int)rdev->rmap.rx_buf);
-			rdev->rmap.rx_buf = NULL;
-		}
-		printk(KERN_INFO "rx_buf released\n");
-		cdev_del(rdev->roach_devs);
-		printk(KERN_INFO "Char device 1 released\n");
-		cdev_del((rdev->roach_devs) + 1);
-		printk(KERN_INFO "Char device 2 released\n");
-		kfree(rdev);
-		printk(KERN_INFO "Freed the rdev structure released\n");
-		rdev = NULL;
-	}
-	unregister_chrdev_region(MKDEV(roach_major, 0), ROACH_NR_DEVS);
-	printk(KERN_INFO "%s: roach2 kernel module unloaded\n", __func__);
+      printk(KERN_INFO "smap and fpga regions released\n");
+    if(rdev->rmap.tx_buf){
+      free_page((int)rdev->rmap.tx_buf);
+      rdev->rmap.tx_buf = NULL;
+    }
+    printk(KERN_INFO "tx_buf released\n");
+    if(rdev->rmap.rx_buf){
+      free_page((int)rdev->rmap.rx_buf);
+      rdev->rmap.rx_buf = NULL;
+    }
+    printk(KERN_INFO "rx_buf released\n");
+    cdev_del(rdev->roach_devs);
+    printk(KERN_INFO "Char device 1 released\n");
+    cdev_del((rdev->roach_devs) + 1);
+    printk(KERN_INFO "Char device 2 released\n");
+    kfree(rdev);
+    printk(KERN_INFO "Freed the rdev structure released\n");
+    rdev = NULL;
+  }
+  unregister_chrdev_region(MKDEV(roach_major, 0), ROACH_NR_DEVS);
+  printk(KERN_INFO "%s: roach2 kernel module unloaded\n", __func__);
 }
 
 /*
- * Module declarations and macros
+* Module declarations and macros
  */
 MODULE_AUTHOR("Shanly Rajan <shanly.rajan@ska.ac.za>");
 MODULE_DESCRIPTION("Hardware access driver for ROACH2 board");
