@@ -74,54 +74,64 @@ void roach_vma_close(struct vm_area_struct *vma)
 {
   printk(KERN_NOTICE "roach VMA close.\n");
 }
-
+#if 0
 static int roach_vma_sync(struct vm_area_struct *vma, unsigned long offset, size_t size, unsigned int flags)
 {
-  printk(KERN_NOTICE "%s: offset: %lu size: %lx flags:%d\n", __func__, offset, size, flags);
+  printk(KERN_NOTICE "%s: offset: %lu size: %d flags:%d\n", __func__, offset, size, flags);
   
 
   return 0;
 }
+#endif
 
 static struct vm_operations_struct roach_remap_vm_ops = {
   .open = roach_vma_open,
   .close = roach_vma_close,
-  .sync = roach_vma_sync,
+//  .sync = roach_vma_sync,
 };
-
 
 static int roach_mem_mmap(struct file *file,
     struct vm_area_struct *vma)
 {
-  unsigned long start = vma->vm_start;
-  unsigned long size = vma->vm_end - vma->vm_start;
-  unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-  unsigned long page, pos;
+  unsigned long start, vsize, offset, addr;
+  unsigned long page, pos, dummy_pos;
 
-  printk(KERN_NOTICE "%s: vm_start %lx, vm_end %lx, size %lx, phys %lx\n",
+  /* VMA properties */
+  start = vma->vm_start;
+  vsize = vma->vm_end - vma->vm_start;
+  offset = vma->vm_pgoff << PAGE_SHIFT;
+
+  printk(KERN_NOTICE "%s: vm_start %lx, vm_end %lx, vsize %lx, offset %lx\n",
       __func__, vma->vm_start, vma->vm_end, (vma->vm_end - vma->vm_start), vma->vm_pgoff << PAGE_SHIFT);
 
-  if (offset + size > ROACH_FPGA_LENGTH) {
+  if (offset + vsize > ROACH_FPGA_LENGTH) {
     return -EINVAL;
   }
 
   pos = (unsigned long)(rdev->rmap.fpga_virt) + offset;
   printk(KERN_NOTICE "%s: pos to be converted : %lx\n", __func__, pos);
 
-  while (size > 0) {
-    page = vmalloc_to_pfn((void *)pos);
-    if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
-      return -EAGAIN;
-    }
-    start += PAGE_SIZE;
-    pos += PAGE_SIZE;
-    if (size > PAGE_SIZE)
-      size -= PAGE_SIZE;
-    else
-      size = 0;
-  }
 
   vma->vm_flags |= VM_RESERVED;   /* avoid to swap out this VMA */
+
+
+  /*NOTE: This is the sole change i made to make sure the mmaped write work
+	  and renamed size variable to vsize*/
+
+  vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+  while (vsize > 0) {
+	  page = vmalloc_to_pfn((void *)pos);
+	  if (remap_pfn_range(vma, start, page, PAGE_SIZE, vma->vm_page_prot)) {
+		  return -EAGAIN;
+	  }
+	  start += PAGE_SIZE;
+	  pos += PAGE_SIZE;
+	  if (vsize > PAGE_SIZE)
+		  vsize -= PAGE_SIZE;
+	  else
+		  vsize = 0;
+  }
 
   vma->vm_ops = &roach_remap_vm_ops;
   roach_vma_open(vma);
